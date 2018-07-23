@@ -80,7 +80,7 @@ public class SplashActivity extends AppCompatActivity {
     private TextView mVersionNameTextView;
     private TextView mInfoTextView;
     private String mImei;
-    MyOpenHelperUtil oh = new MyOpenHelperUtil(this.getApplicationContext(), DB_NAME, null, 1);
+    MyOpenHelperUtil mMyOpenHelper;
 
     private void setImei() {
         String imei = imei();
@@ -143,48 +143,82 @@ public class SplashActivity extends AppCompatActivity {
                     //弹出对话框,提示用户更新
                     showUpdateDialog();
                     break;
-
-                case URL_ERROR:
-                    ToastUtil.show(getApplicationContext(), "网络异常");
-                    finish();
-                    break;
                 case IO_ERROR:
-                    ToastUtil.show(getApplicationContext(), "网络异常");
-                    finish();
-                    break;
+
                 case JSON_ERROR:
-                    ToastUtil.show(getApplicationContext(), "网络异常");
-                    finish();
-                    break;
-                case IDENTITY_VERIFICATION:
-                    Boolean isVerificated = (Boolean) msg.obj;
+                case URL_ERROR:
 
-                    if (isVerificated) {
-                        SQLiteDatabase db = oh.getWritableDatabase();
+                    SQLiteDatabase dbUrl = mMyOpenHelper.getWritableDatabase();
+                    boolean result = false;
+                    try {
 
-                        Cursor cursor = db.rawQuery("select * from t_state", null);
+                        Cursor cursor = dbUrl.rawQuery("select * from t_state", null);
 
                         if (cursor.moveToNext()) {
 
-                            String id = cursor.getString(cursor.getColumnIndex("_id"));
-                            ContentValues values = new ContentValues();
-                            values.put("state1", mImei);
-                            values.put("state2", Md5Util.encode(mImei + "1"));
-                            db.update("person", values, "_id = ?", new String[]{id});
+                            String imei = cursor.getString(cursor.getColumnIndex("state1"));
+
+                            result = imei.equals(mImei);
+
 
 
                         } else {
-
-                            ContentValues values = new ContentValues();
-                            values.put("state1", mImei);
-                            values.put("state2", Md5Util.encode(mImei + "1"));
-
-                            db.insert("t_state", null, values);
+                            result = false;
 
 
                         }
                         cursor.close();
-                        db.close();
+
+
+                    } finally {
+                        dbUrl.close();
+                    }
+
+                    if (result) {
+                        enterHome();
+                    } else {
+
+                        ToastUtil.show(getApplicationContext(), "未授权!");
+                        finish();
+                    }
+                    break;
+
+
+                case IDENTITY_VERIFICATION:
+                    Boolean isVerificated = (Boolean) msg.obj;
+
+                    if (isVerificated) {
+                        SQLiteDatabase db = mMyOpenHelper.getWritableDatabase();
+
+                        try {
+
+                            Cursor cursor = db.rawQuery("select * from t_state", null);
+
+                            if (cursor.moveToNext()) {
+
+                                String id = cursor.getString(cursor.getColumnIndex("_id"));
+                                ContentValues values = new ContentValues();
+                                values.put("state1", mImei);
+                                values.put("state2", Md5Util.encode(mImei + "1"));
+                                db.update("t_state", values, "_id = ?", new String[]{id});
+
+
+                            } else {
+
+                                ContentValues values = new ContentValues();
+                                values.put("state1", mImei);
+                                values.put("state2", Md5Util.encode(mImei + "1"));
+
+                                db.insert("t_state", null, values);
+
+
+                            }
+                            cursor.close();
+
+
+                        } finally {
+                            db.close();
+                        }
                         enterHome();
                     } else {
                         Toast.makeText(SplashActivity.this, "未授权!", Toast.LENGTH_LONG).show();
@@ -222,7 +256,7 @@ public class SplashActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        oh.close();
+        mMyOpenHelper.close();
         super.onDestroy();
     }
 
@@ -529,7 +563,7 @@ public class SplashActivity extends AppCompatActivity {
     private void initData() {
 
         mLocalVersionCode = getVersionCode();
-
+        mMyOpenHelper = new MyOpenHelperUtil(this.getApplicationContext(), DB_NAME, null, 1);
 
     }
 
