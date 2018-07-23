@@ -521,7 +521,7 @@ public class SplashActivity extends AppCompatActivity {
      * 进入应用程序主界面
      */
     protected void enterHome() {
-        Intent intent = new Intent(this, HomeActivity.class);
+        Intent intent = new Intent(this,BluetoothChatActivity.class);
         startActivity(intent);
         //在开启一个新的界面后,将导航界面关闭(导航界面只可见一次)
         finish();
