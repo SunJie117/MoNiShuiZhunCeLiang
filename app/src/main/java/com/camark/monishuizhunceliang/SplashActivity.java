@@ -318,16 +318,21 @@ public class SplashActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         switch (requestCode) {
-            case RESULT_INSTALL_CODE:
-                //enterHome();
-                Toast.makeText(this, "需要升级到最新版本!", Toast.LENGTH_LONG).show();
-                finish();
-                break;
             case RESULT_INSTALL_NEW_CODE:
-                //enterHome();
+            case RESULT_INSTALL_CODE:
+                String path = Environment.getExternalStorageDirectory().getAbsolutePath()
+                        + File.separator + "moniceliang.apk";
+
+                File apkFile = new File(path);
+
+                if (apkFile.exists()) {
+                    apkFile.delete();
+                }
                 Toast.makeText(this, "需要升级到最新版本!", Toast.LENGTH_LONG).show();
                 finish();
                 break;
+
+
             default:
                 //Toast.makeText(this, "default", Toast.LENGTH_LONG).show();
                 break;
@@ -378,6 +383,15 @@ public class SplashActivity extends AppCompatActivity {
      * 检测版本号
      */
     private void checkVersion() {
+        String path = Environment.getExternalStorageDirectory().getAbsolutePath()
+                + File.separator + "moniceliang.apk";
+
+        File apkFile = new File(path);
+
+        if (apkFile.exists()) {
+            apkFile.delete();
+        }
+
         new Thread() {
             public void run() {
                 //发送请求获取数据,参数则为请求json的链接地址
