@@ -4,8 +4,11 @@ import android.Manifest;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.media.MediaScannerConnection;
 import android.os.Bundle;
 import android.os.Environment;
@@ -25,6 +28,9 @@ import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.camark.monishuizhunceliang.util.Md5Util;
+import com.camark.monishuizhunceliang.util.MyOpenHelperUtil;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -111,6 +117,8 @@ public class BluetoothChatActivity extends AppCompatActivity {
 
     private File mXianLuWenJianPath = null;// 已知点名存储文件
 
+    MyOpenHelperUtil mMyOpenHelper;
+
 
     private boolean hasWriteExternalStoragePermission() {
         return ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
@@ -121,31 +129,7 @@ public class BluetoothChatActivity extends AppCompatActivity {
 
         switch (requestCode) {
             case REQUEST_WRITE:
-                if (hasWriteExternalStoragePermission()) {
 
-
-                    getShuJuLineFromDat(new File(Environment.getExternalStorageDirectory(), "shuJu/ceDuan.dat"),mDatLineList,
-                            mQianHouShiBiaoShiList,
-                            mDianHaoList,
-                            mShiJuList,
-                            mChiDuShuList,
-                            mGuanCeTimeList,
-                            mCeZhanList);
-
-                    if (mDatLineList.size() > 0) {
-                        mHandler.obtainMessage(BluetoothChatActivity.MESSAGE_CLEAR, -1, -1, null)
-                                .sendToTarget();
-                        mHandler.obtainMessage(BluetoothChatActivity.MESSAGE_WRITE, -1, -1, mCeZhanList.get(0).getBytes())
-                                .sendToTarget();
-                        mHandler.obtainMessage(BluetoothChatActivity.MESSAGE_WRITE, -1, -1, mDatLineList.get(0).getBytes())
-                                .sendToTarget();
-
-
-                    }
-
-                } else {
-                    Toast.makeText(this, "需要读写SD卡权限!", 1).show();
-                }
             default:
                 super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         }
@@ -160,33 +144,8 @@ public class BluetoothChatActivity extends AppCompatActivity {
 
         // Set up the window layout
         setContentView(R.layout.main);
-        /*
-        if (hasWriteExternalStoragePermission()) {
-            getShuJuLineFromDat(new File(Environment.getExternalStorageDirectory(), "shuJu/ceDuan.dat"),mDatLineList,
-                    mQianHouShiBiaoShiList,
-                    mDianHaoList,
-                    mShiJuList,
-                    mChiDuShuList,
-                    mGuanCeTimeList,
-                    mCeZhanList);
 
-            if (mDatLineList.size() > 0) {
-                mHandler.obtainMessage(BluetoothChatActivity.MESSAGE_CLEAR, -1, -1, null)
-                        .sendToTarget();
-                mHandler.obtainMessage(BluetoothChatActivity.MESSAGE_WRITE, -1, -1, mCeZhanList.get(0).getBytes())
-                        .sendToTarget();
-                mHandler.obtainMessage(BluetoothChatActivity.MESSAGE_WRITE, -1, -1, mDatLineList.get(0).getBytes())
-                        .sendToTarget();
-
-
-            }
-
-
-        } else {
-
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_WRITE);
-        }*/
-
+        mMyOpenHelper = new MyOpenHelperUtil(this.getApplicationContext(), SplashActivity.DB_NAME, null, 1);
 
         // Get local Bluetooth adapter
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -754,6 +713,31 @@ public class BluetoothChatActivity extends AppCompatActivity {
                 break;
             case REQUEST_WEN_JIAN_LIST:
                 if (resultCode == Activity.RESULT_OK) {
+                    /*/////////////////////////////////////////////////////////////////////////
+                    SQLiteDatabase db = mMyOpenHelper.getWritableDatabase();
+
+                    try {
+
+                        Cursor cursor = db.rawQuery("select * from t_state", null);
+
+                        if (cursor.moveToNext()) {
+
+                            String id = cursor.getString(cursor.getColumnIndex("_id"));
+                            ContentValues values = new ContentValues();
+                            values.put("state1", mImei);
+                            values.put("state2", Md5Util.encode(mImei + "1"));
+                            db.update("t_state", values, "_id = ?", new String[]{id});
+
+
+                        }
+                        cursor.close();
+
+
+                    } finally {
+                        db.close();
+                    }
+
+                    /////////////////////////////////////////////////////////////////////////////////*/
                     String xianLuWenJianMing = data.getExtras().getString(
                             XianLuWenJianActivity.EXTRA_XIAN_LU_WEN_JIAN);
 
@@ -823,7 +807,8 @@ public class BluetoothChatActivity extends AppCompatActivity {
                 return true;
             case R.id.discoverable:
                 // Ensure this device is discoverable by others
-                ensureDiscoverable();
+                //ensureDiscoverable();
+                finish();
                 return true;
         }
         return false;
