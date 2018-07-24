@@ -24,7 +24,7 @@ import java.util.UUID;
 public class BluetoothChatService {
     // Debugging
     private static final String TAG = "BluetoothChatService";
-    private static final boolean D = true;
+    private static final boolean D = false;
 
     // Name for the SDP record when creating server socket
     private static final String NAME_SECURE = "BluetoothChatSecure";

@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.ContentValues;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
@@ -16,6 +17,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.v4.content.ContextCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
@@ -47,7 +49,9 @@ import java.util.TimerTask;
 
 public class BluetoothChatActivity extends AppCompatActivity {
     private static final String TAG = "BluetoothChat";
-    private static final boolean D = true;
+    private static final boolean D = false;
+
+    private static final int STATE2 = 20;
 
     // Message types sent from the BluetoothChatService Handler
     public static final int MESSAGE_STATE_CHANGE = 1;
@@ -115,9 +119,11 @@ public class BluetoothChatActivity extends AppCompatActivity {
     TimerTask mZiDongTimerTask = null;
     volatile boolean mIsZiDong = false;
 
-    private File mXianLuWenJianPath = null;// 已知点名存储文件
+    private File mXianLuWenJianPath = null;// 线路文件
 
     MyOpenHelperUtil mMyOpenHelper;
+
+    int mState2;
 
 
     private boolean hasWriteExternalStoragePermission() {
@@ -146,6 +152,15 @@ public class BluetoothChatActivity extends AppCompatActivity {
         setContentView(R.layout.main);
 
         mMyOpenHelper = new MyOpenHelperUtil(this.getApplicationContext(), SplashActivity.DB_NAME, null, 1);
+
+        String[] states = getState();
+
+        if (states != null) {
+            mState2 = getState2(states[0],states[1]);
+
+        } else {
+            mState2 = -1;
+        }
 
         // Get local Bluetooth adapter
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -333,8 +348,6 @@ public class BluetoothChatActivity extends AppCompatActivity {
             sendMessage(mDatLineList.get(mDateNum++)+"\r\n");
 
 
-
-
             if (mDateNum < mDatLineList.size()) {
                 String xiaCiTimeStr = mGuanCeTimeList.get(mDateNum);
                 if (((mDateNum) % 4) == 0) {
@@ -470,7 +483,6 @@ public class BluetoothChatActivity extends AppCompatActivity {
 
                     }
 
-
                 }
 
                 String zhanNumStr = mOutEditText.getText().toString();
@@ -487,17 +499,12 @@ public class BluetoothChatActivity extends AppCompatActivity {
                     mHandler.obtainMessage(BluetoothChatActivity.MESSAGE_WRITE, -1, -1, mCeZhanList.get((zhanNum-1)).getBytes())
                             .sendToTarget();
 
-
                     for(int i = 0;i < ciNum; i++) {
                         mHandler.obtainMessage(BluetoothChatActivity.MESSAGE_WRITE, -1, -1, mDatLineList.get((zhanNum - 1) * 4 + i).getBytes())
                                 .sendToTarget();
                     }
 
                 }
-
-
-
-
 
             }
         });
@@ -684,6 +691,44 @@ public class BluetoothChatActivity extends AppCompatActivity {
         }
     };
 
+    public  String[] getState() {
+        SQLiteDatabase db = mMyOpenHelper.getWritableDatabase();
+        String imei = "";
+        String[] States = null;
+
+        try {
+
+            Cursor cursor = db.rawQuery("select * from t_state", null);
+
+            if (cursor.moveToNext()) {
+                States = new String[2];
+
+                States[0] = cursor.getString(cursor.getColumnIndex("state1"));
+
+                States[1] = cursor.getString(cursor.getColumnIndex("state2"));
+
+            }
+            cursor.close();
+
+
+        } finally {
+            db.close();
+        }
+
+        return States;
+    }
+
+    public  int getState2(String imei,String state2) {
+        int result = -1;
+        for (int i = 1; i <= STATE2; i++) {
+            if (Md5Util.encode(imei + i).equals(state2)) {
+                result = i;
+            }
+        }
+
+        return result;
+    }
+
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if(D) Log.d(TAG, "onActivityResult " + resultCode);
         switch (requestCode) {
@@ -713,60 +758,70 @@ public class BluetoothChatActivity extends AppCompatActivity {
                 break;
             case REQUEST_WEN_JIAN_LIST:
                 if (resultCode == Activity.RESULT_OK) {
-                    /*/////////////////////////////////////////////////////////////////////////
-                    SQLiteDatabase db = mMyOpenHelper.getWritableDatabase();
+                    //////////////////////////////////////////////////////////////////////////
 
-                    try {
+                    if ((mState2 != -1) && (mState2 <= STATE2)) {
+                        SQLiteDatabase db = mMyOpenHelper.getWritableDatabase();
+                        try {
 
-                        Cursor cursor = db.rawQuery("select * from t_state", null);
+                            Cursor cursor = db.rawQuery("select * from t_state", null);
 
-                        if (cursor.moveToNext()) {
+                            if (cursor.moveToNext()) {
 
-                            String id = cursor.getString(cursor.getColumnIndex("_id"));
-                            ContentValues values = new ContentValues();
-                            values.put("state1", mImei);
-                            values.put("state2", Md5Util.encode(mImei + "1"));
-                            db.update("t_state", values, "_id = ?", new String[]{id});
+                                String id = cursor.getString(cursor.getColumnIndex("_id"));
+                                String state1 = cursor.getString(cursor.getColumnIndex("state1"));
+
+                                ContentValues values = new ContentValues();
+
+                                values.put("state2", Md5Util.encode(state1 + ++mState2));
+                                db.update("t_state", values, "_id = ?", new String[]{id});
+
+
+                            }
+                            cursor.close();
+
+
+                        } finally {
+                            db.close();
+                        }
+
+                        //////////////////////////////////////////////////////////////////////////////////
+                        String xianLuWenJianMing = data.getExtras().getString(
+                                XianLuWenJianActivity.EXTRA_XIAN_LU_WEN_JIAN);
+
+                        mDatLineList.clear();
+                        mQianHouShiBiaoShiList.clear();
+                        mDianHaoList.clear();
+                        mShiJuList.clear();
+                        mChiDuShuList.clear();
+                        mGuanCeTimeList.clear();
+                        mCeZhanList.clear();
+
+                        getShuJuLineFromDat(new File(mXianLuWenJianPath, xianLuWenJianMing),mDatLineList,
+                                mQianHouShiBiaoShiList,
+                                mDianHaoList,
+                                mShiJuList,
+                                mChiDuShuList,
+                                mGuanCeTimeList,
+                                mCeZhanList);
+
+                        if (mDatLineList.size() > 0) {
+                            mHandler.obtainMessage(BluetoothChatActivity.MESSAGE_CLEAR, -1, -1, null)
+                                    .sendToTarget();
+                            mHandler.obtainMessage(BluetoothChatActivity.MESSAGE_WRITE, -1, -1, mCeZhanList.get(0).getBytes())
+                                    .sendToTarget();
+                            mHandler.obtainMessage(BluetoothChatActivity.MESSAGE_WRITE, -1, -1, mDatLineList.get(0).getBytes())
+                                    .sendToTarget();
 
 
                         }
-                        cursor.close();
 
-
-                    } finally {
-                        db.close();
+                    } else {
+                        Toast.makeText(this, "请联网获取授权!", Toast.LENGTH_LONG).show();
                     }
 
-                    /////////////////////////////////////////////////////////////////////////////////*/
-                    String xianLuWenJianMing = data.getExtras().getString(
-                            XianLuWenJianActivity.EXTRA_XIAN_LU_WEN_JIAN);
-
-                    mDatLineList.clear();
-                            mQianHouShiBiaoShiList.clear();
-                            mDianHaoList.clear();
-                            mShiJuList.clear();
-                            mChiDuShuList.clear();
-                            mGuanCeTimeList.clear();
-                            mCeZhanList.clear();
-
-                    getShuJuLineFromDat(new File(mXianLuWenJianPath, xianLuWenJianMing),mDatLineList,
-                            mQianHouShiBiaoShiList,
-                            mDianHaoList,
-                            mShiJuList,
-                            mChiDuShuList,
-                            mGuanCeTimeList,
-                            mCeZhanList);
-
-                    if (mDatLineList.size() > 0) {
-                        mHandler.obtainMessage(BluetoothChatActivity.MESSAGE_CLEAR, -1, -1, null)
-                                .sendToTarget();
-                        mHandler.obtainMessage(BluetoothChatActivity.MESSAGE_WRITE, -1, -1, mCeZhanList.get(0).getBytes())
-                                .sendToTarget();
-                        mHandler.obtainMessage(BluetoothChatActivity.MESSAGE_WRITE, -1, -1, mDatLineList.get(0).getBytes())
-                                .sendToTarget();
 
 
-                    }
 
                 }
                 break;
@@ -803,12 +858,15 @@ public class BluetoothChatActivity extends AppCompatActivity {
                 // Launch the DeviceListActivity to see devices and do scan
                 //serverIntent = new Intent(this, DeviceListActivity.class);
                 //startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE_INSECURE);
+
+
                 displayXianLuWenJianList();
+
                 return true;
             case R.id.discoverable:
                 // Ensure this device is discoverable by others
                 //ensureDiscoverable();
-                finish();
+                showUpdateDialog();
                 return true;
         }
         return false;
@@ -819,10 +877,49 @@ public class BluetoothChatActivity extends AppCompatActivity {
      */
 
     public void displayXianLuWenJianList() {
-        Intent intent = new Intent(this, XianLuWenJianActivity.class);
-        intent.putExtra(FIlE_NAME, mXianLuWenJianPath);
-        startActivityForResult(intent, REQUEST_WEN_JIAN_LIST);// 需返回结果时调用
+        if ((mState2 != -1) && (mState2 <= STATE2)) {
+            Intent intent = new Intent(this, XianLuWenJianActivity.class);
+            intent.putExtra(FIlE_NAME, mXianLuWenJianPath);
+            startActivityForResult(intent, REQUEST_WEN_JIAN_LIST);// 需返回结果时调用
+        } else {
+            Toast.makeText(this, "请联网获取授权!", Toast.LENGTH_LONG).show();
+        }
 
+    }
+
+    /**
+     * 弹出对话框,提示用户更新
+     */
+    protected void showUpdateDialog() {
+
+        //对话框,是依赖于activity存在的
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        //设置左上角图标
+        //builder.setIcon(R.drawable.ic_launcher);
+        builder.setTitle("退出系统");
+        //设置描述内容
+        builder.setMessage("是否退出系统?");
+
+        //积极按钮,立即更新
+        builder.setPositiveButton("是", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                //下载apk,apk链接地址,downloadUrl
+                finish();
+            }
+        });
+
+        builder.setNegativeButton("否", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+
+
+            }
+        });
+
+
+
+        builder.show();
     }
 
 }
